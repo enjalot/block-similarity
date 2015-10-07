@@ -1,26 +1,51 @@
 fs = require 'fs'
 path = require 'path'
 
-fns = fs.readdirSync(__dirname + '/api')
+dir = process.argv[2] || __dirname + '/api'
+
+fns = fs.readdirSync(dir)
 #console.log(fns.sort())
-functions = fns.map (fn) ->
-  path.basename(fn, '.json')
+functions = []
+fns.forEach (fn) ->
+  if fn.indexOf('.json') > 0
+    functions.push path.basename(fn, '.json')
 #console.log functions
 fs.writeFileSync('functions.json', JSON.stringify(functions))
 
 util = require './util'
 
 gists = {}
+blocks = {}
+blockArray = []
 functions.forEach (fn) ->
   # read the file for each function
-  data = JSON.parse fs.readFileSync __dirname + '/api/' + fn + '.json'
+  data = JSON.parse fs.readFileSync path.join(dir, fn + '.json')
 
-  blocks = Object.keys data.blocks
-  console.log "processing #{blocks.length} blocks for #{fn}"
-  blocks.forEach (block) ->
-    gist = gists[block]
+  blockIds = Object.keys data.blocks
+  console.log "processing #{blockIds.length} blocks for #{fn}"
+  blockIds.forEach (blockId) ->
+    gist = gists[blockId]
     if !gist
-      gist = gists[block] = new util.Vector
+      gist = gists[blockId] = new util.Vector
     gist[fn] = util.POSITIVE
 
+    block = blocks[blockId]
+    if !block
+      block = blocks[blockId] = data.blocks[blockId]
+
+blockIds = Object.keys blocks
+blockIds.forEach (blockId) ->
+  block = blocks[blockId]
+  block.id = blockId
+  delete block.count
+  #block.api = gists[blockId]
+  vec = gists[blockId]
+  api = {}
+  functions.forEach (fn) ->
+    if vec[fn]
+      api[fn] = vec[fn]
+  block.api = api
+  blockArray.push block
+
 fs.writeFileSync "gists.json", JSON.stringify(gists)
+fs.writeFileSync "blocks.json", JSON.stringify(blockArray)
